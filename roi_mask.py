@@ -1,19 +1,3 @@
-"""
-Построение ROI-маски вручную: обводим область ВНЕ трубки,
-где реально есть клетки. Маска сохраняется в PNG (бинарная).
-
-Использование:
-    1. Запусти этот скрипт.
-    2. Откроется окно с кадром.
-    3. Левый клик — добавить точку полигона.
-       Правый клик — отменить последнюю точку.
-       Двойной левый клик — закрыть полигон (соединит с первой точкой).
-    4. После закрытия первого полигона можно начать второй (если зон несколько).
-    5. Закрой окно когда закончил — маска сохранится.
-
-ВАЖНО: обводи именно те зоны, ГДЕ ХОЧЕШЬ детектить клетки
-(то есть вне трубки). Всё остальное будет отфильтровано.
-"""
 import numpy as np
 import czifile
 import matplotlib.pyplot as plt
@@ -23,7 +7,7 @@ import cv2
 from pathlib import Path
 
 CZI_PATH = "data_czi/12mmc+lncap.czi"
-FRAME_FOR_MASK = 1   # на каком кадре строить (трубка одна и та же на всех)
+FRAME_FOR_MASK = 1   # на каком кадре строить
 OUT_MASK_PNG = "diagnostics/roi_mask.png"
 OUT_PREVIEW_PNG = "diagnostics/roi_mask_preview.png"
 
@@ -54,8 +38,6 @@ def main():
     img = normalize(frames[FRAME_FOR_MASK])
     H, W = img.shape
     print(f"Размер: {W}x{H}")
-
-    # Список полигонов (можно добавить несколько)
     polygons = []
 
     fig, ax = plt.subplots(figsize=(20, 8))
@@ -68,11 +50,9 @@ def main():
     drawn_patches = []
 
     def on_select(verts):
-        """Вызывается когда пользователь закрыл полигон."""
         if len(verts) < 3:
             return
         polygons.append(verts)
-        # Рисуем закрашенный полигон полупрозрачно
         patch = MplPolygon(verts, closed=True, alpha=0.3,
                            facecolor='lime', edgecolor='lime', linewidth=2)
         ax.add_patch(patch)
@@ -80,7 +60,6 @@ def main():
         fig.canvas.draw_idle()
         print(f"Полигон #{len(polygons)} добавлен ({len(verts)} точек). "
               f"Можно начать новый или закрыть окно.")
-        # Перезапускаем селектор для следующего полигона
         nonlocal selector
         selector.disconnect_events()
         selector = PolygonSelector(ax, on_select, useblit=True,
@@ -98,7 +77,6 @@ def main():
         print("Нет полигонов, маска не сохранена.")
         return
 
-    # Строим бинарную маску: 1 внутри полигонов (где есть клетки), 0 снаружи
     mask = np.zeros((H, W), dtype=np.uint8)
     for verts in polygons:
         pts = np.array(verts, dtype=np.int32)
@@ -109,7 +87,7 @@ def main():
     print(f"Полигонов: {len(polygons)}, площадь маски: "
           f"{(mask > 0).sum() / mask.size * 100:.1f}% от кадра")
 
-    # Превью: исходник + маска полупрозрачно
+    # исходник + маска
     fig, ax = plt.subplots(figsize=(20, 8))
     ax.imshow(img, cmap='gray')
     overlay = np.zeros((H, W, 4), dtype=np.float32)
