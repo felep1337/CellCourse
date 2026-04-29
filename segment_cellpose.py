@@ -1,14 +1,3 @@
-"""
-Сегментация всех кадров через Cellpose v3 + ROI-маска из PNG.
-
-Логика: Cellpose работает на полном кадре, но детекции, чьи центроиды
-попадают вне ROI-маски, отбрасываются.
-
-Альтернатива (более быстрая): подать в Cellpose уже замаскированный кадр
-(вне маски — заливка медианой). Это сэкономит вычисления и снизит шанс,
-что Cellpose "перетянет" контраст под перемычки трубки.
-Эту опцию включает MASK_INPUT_IMAGE = True.
-"""
 import numpy as np
 import pickle
 import czifile
@@ -19,7 +8,6 @@ from pathlib import Path
 import time
 import matplotlib.pyplot as plt
 
-# ============ ПАРАМЕТРЫ ============
 CZI_PATH = "data_czi/12mmc+lncap.czi"
 ROI_MASK_PNG = "diagnostics/roi_mask.png"
 OUT_PKL = "diagnostics/detections.pkl"
@@ -32,14 +20,10 @@ CELLPROB_THRESHOLD = 0.0
 AREA_MIN = 30
 AREA_MAX = 800
 
-# Если True — заливаем медианой пиксели вне ROI ДО подачи в Cellpose.
-# Это убирает влияние трубки на нормализацию контраста.
-# Если False — Cellpose видит весь кадр, фильтруем только детекции.
 MASK_INPUT_IMAGE = False
 
 DEBUG_PREVIEW_FRAMES = 3
 DEBUG_DIR = "calibration/segmentation_preview"
-# ===================================
 
 
 def load_czi_frames(filepath):
@@ -61,7 +45,6 @@ def normalize_for_cellpose(img):
 
 
 def apply_mask_to_image(img, mask):
-    """Заливаем пиксели вне маски медианой ROI."""
     inside_median = int(np.median(img[mask > 0])) if (mask > 0).any() else int(img.mean())
     out = img.copy()
     out[mask == 0] = inside_median
@@ -82,7 +65,6 @@ def masks_to_centers(masks, area_min, area_max):
 
 
 def filter_by_mask(centers, roi_mask):
-    """Оставляем только детекции, чей центроид попадает в маску (>0)."""
     H, W = roi_mask.shape
     out = []
     for (x, y, area) in centers:
@@ -96,7 +78,6 @@ def save_debug_preview(img, centers_raw, centers_filtered, roi_mask, out_path):
     fig, ax = plt.subplots(figsize=(20, 7))
     ax.imshow(img, cmap='gray')
 
-    # ROI зелёным полупрозрачным
     H, W = roi_mask.shape
     overlay = np.zeros((H, W, 4), dtype=np.float32)
     overlay[roi_mask > 0] = [0, 1, 0, 0.15]
